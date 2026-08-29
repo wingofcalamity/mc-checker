@@ -1,49 +1,37 @@
 defmodule Checker.Apps.Minecraft do
-  alias Checker.Apps.Minecraft.VarString
-  alias Checker.Apps.Minecraft.VarInt
+  alias Checker.Apps.Minecraft.Packet
 
   def check_mc(host, port) do
-    case :gen_tcp.connect(
-           String.to_charlist(host),
-           port,
-           [
-             :binary,
-             {:packet, 0},
-             {:active, false}
-           ],
-           5_000
-         ) do
-      {:ok, sock} ->
-        try do
-          with :ok <- :gen_tcp.send(sock, handshake(host, port, 763)),
-               :ok <- :gen_tcp.send(sock, <<1::8, 0::8>>),
-               {:ok, data} <- :gen_tcp.recv(sock, 0, 5_000),
-               {_len, rest} <- VarInt.decode(data),
-               {_packet_id, status} <- VarInt.decode(rest),
-               {result, _rest} <- VarString.decode(status) do
-            {:ok, result}
-          end
-        after
-          :gen_tcp.close(sock)
-        end
+    tcp_options = [:binary, {:packet, 0}, {:active, false}]
 
-      {:error, :timeout} ->
-        {:error, :timeout}
-
-      {:error, reason} ->
-        {:error, reason}
+    with {:ok, sock} <- :gen_tcp.connect(String.to_charlist(host), port, tcp_options, 5_000) do
+      handshake(sock, host, port)
     end
   end
 
-  defp handshake(host, port, protocol) do
-    body = <<
-      VarInt.encode(0)::binary,
-      VarInt.encode(protocol)::binary,
-      VarString.encode(host)::binary,
-      port::unsigned-big-16,
-      VarInt.encode(1)::binary
-    >>
+  defp handshake(sock, host, port) do
+    try do
+      with :ok <- :gen_tcp.send(sock, Packet.encode_handshake(host, port, 763)),
+           :ok <- :gen_tcp.send(sock, <<1::8, 0::8>>),
+           {:ok, frame, _rest} <- recv_frame(sock, <<>>),
+           {:ok, result} <- Packet.decode_status(frame) do
+        {:ok, result}
+      end
+    after
+      :gen_tcp.close(sock)
+    end
+  end
 
-    <<VarInt.encode(byte_size(body))::binary, body::binary>>
+  defp recv_frame(sock, acc) do
+    {:ok, data} = :gen_tcp.recv(sock, 0)
+    acc = <<acc::binary, data::binary>>
+
+    case Packet.decode_frame(acc) do
+      {:ok, data, rest} ->
+        {:ok, data, rest}
+
+      :incomplete ->
+        recv_frame(sock, acc)
+    end
   end
 end
