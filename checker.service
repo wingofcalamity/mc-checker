@@ -1,0 +1,19 @@
+[Unit]
+Description=Checker Elixir App
+After=network.target
+
+[Service]
+Type=forking
+User=checker
+WorkingDirectory=/opt/checker
+
+ExecStart=/opt/checker/bin/checker daemon
+ExecStop=/opt/checker/bin/checker stop
+
+Restart=on-failure
+RestartSec=5
+Environment=MIX_ENV=prod
+Environment=LANG=en_US.UTF-8
+
+[Install]
+WantedBy=multi-user.target
