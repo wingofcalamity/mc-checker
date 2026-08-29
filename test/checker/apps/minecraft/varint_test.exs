@@ -13,6 +13,10 @@ defmodule VarIntTest do
       assert VarInt.encode(255) == <<0xFF, 0x01>>
       assert VarInt.encode(300) == <<0xAC, 0x02>>
     end
+    test "encodes negative values" do
+      assert VarInt.encode(-1) == <<0xFF, 0xFF, 0xFF, 0xFF, 0x0F>>
+      assert VarInt.encode(-2147483648) == <<0x80, 0x80, 0x80, 0x80, 0x08>>
+    end
   end
 
   describe "decode/1" do
@@ -25,6 +29,10 @@ defmodule VarIntTest do
       assert VarInt.decode(<<0x80, 0x01>>) == {128, <<>>}
       assert VarInt.decode(<<0xFF, 0x01>>) == {255, <<>>}
       assert VarInt.decode(<<0xAC, 0x02>>) == {300, <<>>}
+    end
+    test "decodes negative value" do
+      assert VarInt.decode(<<0xFF, 0xFF, 0xFF, 0xFF, 0x0F>>) == {-1, <<>>}
+      assert VarInt.decode(<<0x80, 0x80, 0x80, 0x80, 0x08>>) == {-2147483648, <<>>}
     end
     test "leaves bytes after the VarInt untouched" do
       assert VarInt.decode(<<0xAC, 0x02, 0xFF, 0xFF>>) == {300, <<0xFF, 0xFF>>}

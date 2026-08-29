@@ -2,6 +2,7 @@ defmodule Checker.Apps.Minecraft.VarInt do
   import Bitwise
 
   def encode(value) do
+    value = value &&& 0xFFFFFFFF
     {encoded, _} = encode(value, <<>>)
     encoded
   end
@@ -24,7 +25,13 @@ defmodule Checker.Apps.Minecraft.VarInt do
     decode(rest, new_acc, shift + 1)
   end
   defp decode(<<continue::1, value::7, rest::binary>>, acc, shift) when continue == 0 do
-    new_acc = acc + (value <<< (shift * 7))
-    {new_acc, rest}
+    value = acc + (value <<< (shift * 7))
+    value =
+      if value >= 0x80000000 do
+        value - 0x100000000
+      else
+        value
+      end
+    {value, rest}
   end
 end

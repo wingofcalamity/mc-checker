@@ -4,4 +4,4 @@ This was pain
 
 ## Todo
 
-- [ ] Fix VarInt for negative values?
+- [x] Fix VarInt for negative values?
