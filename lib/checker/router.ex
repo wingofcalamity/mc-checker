@@ -5,20 +5,21 @@ defmodule Checker.Router do
   plug(:match)
   plug(:dispatch)
 
-  get "/mc" do
-    case Minecraft.check_mc("localhost", 25565) do
-      {:ok, data} ->
-        conn
-        |> put_resp_content_type("application/json")
-        |> send_resp(200, data)
-
+  get "/mc/:port" do
+    with {port, ""} <- Integer.parse(port),
+         {:ok, data} <- Minecraft.check_mc("localhost", port) do
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(200, data)
+    else
       {:error, :timeout} ->
-        conn
-        |> send_resp(503, "timeout")
+        send_resp(conn, 503, "timeout")
 
       {:error, reason} ->
-        conn
-        |> send_resp(503, "#{reason}")
+        send_resp(conn, 503, "#{reason}")
+
+      _ ->
+        send_resp(conn, 400, "invalid port")
     end
   end
 
